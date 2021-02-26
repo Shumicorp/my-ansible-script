@@ -1,0 +1,8 @@
+[jenkins_server]
+linuxServer   ansible_host=10.26.1.173
+[jenkins_node]
+linuxNode     ansible_host=10.26.2.249
+[nagios]
+linuxNagios   ansible_host=10.26.2.174
+[splunk]
+linuxSplunk   ansible_host=10.26.2.148

@@ -1,0 +1,6 @@
+---
+# handlers file for install_Jenkins
+- name: firewall-cmd reload
+    systemd:
+      name: firewalld
+      state: reloaded

@@ -1,0 +1,120 @@
+---
+- name: Up Jenkins 
+  hosts: jenkins_server
+  become: yes
+
+  vars: 
+    file_nrpe: /root/ansible/template/nrpe.cfg
+    nagios_server_ip: 10.26.2.174
+
+
+  tasks:
+
+  - name: write dns server
+    ansible.builtin.copy:
+       src:   /etc/resolv.conf
+       dest:  /etc/resolv.conf
+
+  - name: install jenkins state 1
+    get_url:
+      url:  https://pkg.jenkins.io/redhat-stable/jenkins.repo
+      dest: /etc/yum.repos.d/jenkins.repo
+
+  - name: install jenkins state 2
+    ansible.builtin.rpm_key:
+      state: present
+      key: https://pkg.jenkins.io/redhat-stable/jenkins.io.key
+
+  - name: install jenkins state 3
+    yum:
+      update_cache: yes
+
+  - name: install epel
+    yum:
+      name: epel-release
+      state: latest
+ 
+  - name: install java git maven wget nrpe nagios-plugins
+    yum:   
+     name:
+      - java-1.8.0-openjdk 
+      - maven
+      - git
+      - wget
+      - nrpe
+      - nagios-plugins
+     state: latest
+
+  - name: write nrpe.conf
+    template:
+      src:   "{{ file_nrpe }}"
+      dest:  /etc/nagios/nrpe.cfg
+
+  - name: copy plugins
+    ansible.builtin.copy:
+      src:   /root/ansible/template/plugins
+      dest:  /usr/lib64/nagios/
+      mode:  '777'
+
+  - name: add service NRPE
+    ansible.posix.firewalld:
+      service: nrpe
+      permanent: yes
+      state: enabled
+    notify: firewall-cmd reload
+
+  - name: start nrpe
+    ansible.builtin.systemd:
+      state: started
+      name: nrpe
+      enabled: yes
+
+  - name: open port 5666-5668
+    ansible.posix.firewalld:
+      port: 5666-5668/tcp
+      permanent: yes
+      state: enabled
+    notify: firewall-cmd reload
+
+  - name: open port 8080
+    ansible.posix.firewalld:
+      port: 8080/tcp
+      permanent: yes
+      state: enabled  
+    notify: firewall-cmd reload
+
+  - name: install jenkins state 4
+    yum:
+      name: jenkins
+      state: present 
+
+  - name: install jenkins stata 5
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: add service https
+    ansible.posix.firewalld:
+      service: https
+      permanent: yes
+      state: enabled
+    notify: firewall-cmd reload
+  
+  - name: add service http
+    ansible.posix.firewalld:
+      service: http
+      permanent: yes
+      state: enabled
+    notify: firewall-cmd reload 
+ 
+  - name: start jenkins
+    systemd:
+      name: jenkins
+      state: started
+      enabled: yes
+
+
+  handlers:
+  - name: firewall-cmd reload
+    systemd:
+      name: firewalld
+      state: reloaded

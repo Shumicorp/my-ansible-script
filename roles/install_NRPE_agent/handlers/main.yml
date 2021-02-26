@@ -1,0 +1,6 @@
+---
+# handlers file for intall_NRPE_agent
+- name: firewall-cmd reload
+  systemd:
+    name: firewalld
+    state: reloaded

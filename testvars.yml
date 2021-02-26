@@ -1,0 +1,8 @@
+---
+- name: Up Slaves
+  hosts: jenkins_server
+  become: yes
+
+  roles:
+    - install_Splunk_agent
+

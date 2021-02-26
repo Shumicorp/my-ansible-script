@@ -1,0 +1,51 @@
+---
+- name: Up Slaves
+  hosts: nagios
+  become: yes
+  vars:
+    splunk_server_ip_port: 10.26.2.148:9997
+    username: 'admin'
+    password: '1234m1234'
+    file_userinfo: /root/ansible/template/user-seed.conf
+
+
+  tasks:
+
+  - name: write dns server
+    ansible.builtin.copy:
+       src:   /etc/resolv.conf
+       dest:  /etc/resolv.conf
+
+  - name: Download splunk forwarder
+    get_url:
+      url: 'https://www.splunk.com/bin/splunk/DownloadActivityServlet?architecture=x86_64&platform=linux&version=8.1.2&product=universalforwarder&filename=splunkforwarder-8.1.2-545206cc9f70-Linux-x86_64.tgz&wget=true'
+      dest: /opt/splunkforwarder-8.1.2.tgz
+
+  - name: Unarchive a file that is already on the remote machine
+    ansible.builtin.unarchive:
+      src: /opt/splunkforwarder-8.1.2.tgz
+      dest: /opt/
+      remote_src: yes
+
+  - name: write user-seed.conf
+    template:
+      src:   "{{ file_userinfo }}"
+      dest:  /opt/splunkforwarder/etc/system/local/user-seed.conf
+
+  - name: Create a directory if it does not exist
+    ansible.builtin.file:
+      path: /opt/splunkforwarder
+      state: directory
+      recurse: yes
+      mode: '777'
+
+  - name: splunk start
+    command: './splunk start --accept-license --no-prompt chdir=/opt/splunkforwarder/bin'
+
+  - name: add add forward-server
+    command: './splunk add forward-server {{ splunk_server_ip_port }} -auth {{ username }}:{{ password }} chdir=/opt/splunkforwarder/bin/'
+
+  - name: add monitor
+    command: './splunk add monitor /var/log/messages -index main -sourcetype MyUFServerlog --no-prompt chdir=/opt/splunkforwarder/bin/'
+
+

@@ -1,0 +1,51 @@
+---
+# tasks file for install_Jenkins
+- name: install jenkins state 1
+  get_url:
+    url:  https://pkg.jenkins.io/redhat-stable/jenkins.repo
+    dest: /etc/yum.repos.d/jenkins.repo
+
+- name: install jenkins state 2
+  ansible.builtin.rpm_key:
+    state: present
+    key: https://pkg.jenkins.io/redhat-stable/jenkins.io.key
+
+- name: install jenkins state 3
+  yum:
+    update_cache: yes
+
+- name: open port 8080
+  ansible.posix.firewalld:
+    port: 8080/tcp
+    permanent: yes
+    state: enabled
+  notify: firewall-cmd reload
+
+- name: install jenkins state 4
+  yum:
+    name: jenkins
+    state: present
+
+- name: install jenkins stata 5
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: add service https
+  ansible.posix.firewalld:
+    service: https
+    permanent: yes
+    state: enabled
+  notify: firewall-cmd reload
+
+- name: add service http
+  ansible.posix.firewalld:
+    service: http
+    permanent: yes
+    state: enabled
+  notify: firewall-cmd reload
+
+- name: start jenkins
+  systemd:
+    name: jenkins
+    state: started
+    enabled: yes

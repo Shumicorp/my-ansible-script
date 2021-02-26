@@ -1,0 +1,45 @@
+---
+- name: Up Slaves
+  hosts: jenkins_node
+  become: yes
+  vars:
+    file_nrpe: /root/ansible/template/nrpe.cfg
+    nagios_server_ip: 10.26.2.174
+
+  tasks:
+  
+  - name: install epel
+    yum:
+      name: epel-release
+      state: latest
+
+  - name: install java git maven wget nrpe nagios-plugins
+    yum:
+     name:
+      - nrpe
+      - nagios-plugins
+     state: latest
+
+  - name: write nrpe.conf
+    template:
+       src:   "{{ file_nrpe }}"
+       dest:  /etc/nagios/nrpe.cfg
+
+  - name: copy plugins
+    ansible.builtin.copy:
+       src:   /root/ansible/template/plugins
+       dest:  /usr/lib64/nagios/
+       mode:  '777'
+
+  - name: add service NRPE
+    ansible.posix.firewalld:
+      service: nrpe
+      permanent: yes
+      state: enabled
+    notify: firewall-cmd reload
+
+  handlers:
+  - name: firewall-cmd reload
+    systemd:
+      name: firewalld
+      state: reloaded

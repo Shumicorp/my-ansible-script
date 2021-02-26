@@ -1,0 +1,31 @@
+---
+# tasks file for intall_NRPE_agent
+- name: install epel
+  yum:
+    name: epel-release
+    state: latest
+
+- name: install nrpe nagios-plugins
+  yum:
+   name:
+    - nrpe
+    - nagios-plugins
+   state: latest
+
+- name: write nrpe.conf
+  template:
+     src:   nrpe.cfg
+     dest:  /etc/nagios/nrpe.cfg
+
+- name: copy plugins
+  ansible.builtin.copy:
+     src:   {{ item }}
+     dest:  /usr/lib64/nagios/
+     mode:  '777'
+
+- name: add service NRPE
+  ansible.posix.firewalld:
+    service: nrpe
+    permanent: yes
+    state: enabled
+  notify: firewall-cmd reload

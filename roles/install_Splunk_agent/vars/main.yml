@@ -1,0 +1,6 @@
+---
+# vars file for install_Slunk_agent
+splunk_server_ip_port: 10.26.2.148:9997
+username: 'mr'
+password: '1234m1234'
+

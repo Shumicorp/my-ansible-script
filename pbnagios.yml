@@ -1,0 +1,209 @@
+---
+- name: Up nagios
+  hosts: nagios
+  become: yes
+  vars: 
+    
+    nagios_version: 4.4.5
+    plugins_version: 2.3.3   
+
+  tasks:
+
+  - name: write dns server
+    ansible.builtin.copy:
+       src:   /etc/resolv.conf
+       dest:  /etc/resolv.conf
+ 
+  - name: install epel
+    yum:
+      name: epel-release
+      state: latest
+  
+  - name: install java wget nrpe
+    yum:
+      name:
+      - java-1.8.0-openjdk
+      - python3
+      - python3-devel
+      - wget
+      - nrpe
+      - make
+      - gcc
+      - glibc
+      - glibc-common
+      - unzip
+      - httpd
+      - php
+      - gd
+      - gd-devel
+      - perl
+      - postfix
+      - openssl-devel
+      - autoconf
+      - automake
+      - gettext
+      - net-snmp
+      - net-snmp-utils
+      state: latest 
+  
+  - name: Install bottle python package on version 0.11
+    pip:
+      name: passlib
+
+
+  - name: Disable SELinux
+    ansible.posix.selinux:
+      state: disabled
+
+  - name: Download file nagios core
+    get_url:
+      url: https://github.com/NagiosEnterprises/nagioscore/archive/nagios-{{ nagios_version }}.tar.gz
+      dest: /tmp/nagios-{{ nagios_version }}.tar.gz
+
+  - name: Unarchive a file that is already on the remote machine
+    ansible.builtin.unarchive:
+      src: /tmp/nagios-{{ nagios_version }}.tar.gz
+      dest: /tmp/
+      remote_src: yes
+
+  - name: Running ./configure for nagios
+    command: './configure chdir=/tmp/nagioscore-nagios-{{ nagios_version }}/'
+
+
+  - name: Running make all
+    command: 'make all chdir=/tmp/nagioscore-nagios-{{ nagios_version }}/'
+  
+  - name: Running make install-groups-users
+    command: 'make install-groups-users chdir=/tmp/nagioscore-nagios-{{ nagios_version }}/'
+
+  - name: usermod -a -G nagios apache
+    ansible.builtin.shell:
+      cmd: usermod -a -G nagios apache
+
+  - name: Running make install
+    command: 'make install chdir=/tmp/nagioscore-nagios-{{ nagios_version }}/'
+   
+
+  - name: Running make install-daemoninit
+    command: 'make install-daemoninit chdir=/tmp/nagioscore-nagios-{{ nagios_version }}/' 
+ 
+  - name: Running make install-commandmode
+    command: 'make install-commandmode chdir=/tmp/nagioscore-nagios-{{ nagios_version }}/'
+
+  - name: add service http
+    ansible.posix.firewalld:
+      service: http
+      permanent: yes
+      state: enabled
+    notify: firewall-cmd reload
+ 
+  - name: Running make install-config
+    command: 'make install-config chdir=/tmp/nagioscore-nagios-{{ nagios_version }}/'
+
+  - name: Running make install-webconf
+    command: 'make install-webconf chdir=/tmp/nagioscore-nagios-{{ nagios_version }}/'
+
+  - name: Running make install-exfoliation
+    command: 'make install-exfoliation chdir=/tmp/nagioscore-nagios-{{ nagios_version }}/'
+
+  - name: Running make install-classicui
+    command: 'make install-classicui chdir=/tmp/nagioscore-nagios-{{ nagios_version }}/'
+
+
+
+  - name: Add a user nagiosadmin and password 1234
+    htpasswd:
+      path: /usr/local/nagios/etc/htpasswd.users
+      name: nagiosadmin
+      password: '1234'
+      mode: 0644
+   
+  - name: Restart service httpd
+    ansible.builtin.systemd:
+      state: restarted
+      name: httpd
+      enabled: yes
+
+  - name: open port 80
+    ansible.posix.firewalld:
+      port: 80/tcp
+      permanent: yes
+      state: enabled
+    notify: firewall-cmd reload
+
+
+  - name: open port 5666-5668
+    ansible.posix.firewalld:
+      port: 5666-5668/tcp
+      permanent: yes
+      state: enabled
+    notify: firewall-cmd reload
+
+  - name: Download plugins
+    get_url:
+      url: https://github.com/nagios-plugins/nagios-plugins/releases/download/release-{{ plugins_version }}/nagios-plugins-{{ plugins_version }}.tar.gz
+      dest: /tmp/nagios-plugins.tar.gz
+
+  - name: Unarchive a file that is already on the remote machine
+    ansible.builtin.unarchive:
+      src: /tmp/nagios-plugins.tar.gz
+      dest: /tmp/
+      remote_src: yes
+
+
+  - name: Running ./configure
+    command: './configure --with-nagios-user=nagios chdir=/tmp/nagios-plugins-{{ plugins_version }}/'
+
+  - name: Running make
+    command: 'make chdir=/tmp/nagios-plugins-{{ plugins_version }}/'
+
+  - name: Running make install
+    command: 'sudo make install chdir=/tmp/nagios-plugins-{{ plugins_version }}/'
+
+
+  - name: copy cagios.cfg
+    ansible.builtin.copy:
+       src:   /root/ansible/template/nagios/nagios.cfg
+       dest:  /usr/local/nagios/etc/nagios.cfg
+
+  - name: copy command.cfg
+    ansible.builtin.copy:
+       src:   /root/ansible/template/nagios/objects/commands.cfg
+       dest:  /usr/local/nagios/etc/objects/commands.cfg
+
+  - name: Creates directory
+    file:
+      path: /usr/local/nagios/etc/servers
+      state: directory
+      owner: nagios
+      group: nagios
+      mode: 0775
+
+  - name: copy hosts.cfg in servers
+    ansible.builtin.copy:
+       src:   /root/ansible/template/nagios/servers/
+       dest:  /usr/local/nagios/etc/servers
+
+  - name: copy hosts in server
+    ansible.builtin.copy:
+       src:   /root/ansible/template/nagios/servers/
+       dest:  /usr/local/nagios/etc/servers
+       
+
+  
+  - name: read new nagios.cfg
+    shell:
+      cmd: /usr/local/nagios/bin/nagios -v /usr/local/nagios/etc/nagios.cfg
+
+  - name: nagios restart
+    systemd:
+      name: nagios
+      state: restarted
+      enabled: yes
+
+
+  handlers:
+  - name: firewall-cmd reload
+    systemd:
+      name: firewalld
+      state: reloaded

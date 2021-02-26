@@ -1,0 +1,41 @@
+---
+- name: Up Jenkins
+  hosts: jenkins_server
+  become: yes
+
+  vars:
+    back_up_file: com/my/group/backup/202102080340/backup-202102080340.tar.gz
+
+  tasks: 
+  - name: Download backup
+    get_url:
+      url: http://10.26.2.211:8081/repository/jenkins-backup/{{ back_up_file }}
+      dest: /root/backup.tar.gz
+  
+  - name: start jenkins
+    ansible.builtin.systemd:
+      state: stopped
+      name: jenkins
+
+  - name: unzip backup in folder
+    ansible.builtin.unarchive:
+      src: /root/backup.tar.gz
+      dest: /root/
+      remote_src: yes
+      owner: jenkins
+      group: jenkins
+
+  - name: copy backup file in jenkins
+    ansible.builtin.copy:
+      src: /root/jenkins-backup/
+      dest: /var/lib/jenkins
+      remote_src: yes
+      owner: jenkins
+      group: jenkins
+
+
+  - name: start jenkins
+    ansible.builtin.systemd:
+      state: started
+      name: jenkins
+      enabled: yes
